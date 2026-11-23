@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitKit (offline)</title>
+<style>
+  :root {
+    --bg: #f6f7f8; --card: #ffffff; --text: #1d2125; --muted: #5d6670;
+    --line: #dadfe4; --accent: #c2410c; --accent-dark: #9a3412; --on-accent: #ffffff;
+    --code-bg: #14181c; --code-text: #e6efe9; --warn-bg: #fff6df; --warn-text: #7a5200;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121416; --card: #1b1e21; --text: #e6e9ec; --muted: #9aa3ab;
+      --line: #2c3237; --accent: #fb923c; --accent-dark: #fdba74; --on-accent: #0b0b0b;
+      --code-bg: #0b0d0f; --code-text: #e6efe9; --warn-bg: #3a2f12; --warn-text: #f1cf86;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 28px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px;
+           background: var(--accent); color: var(--on-accent); vertical-align: middle; margin-left: 8px; }
+  .out { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0 12px; }
+  pre#out { margin: 0; padding: 14px 16px; background: var(--code-bg); color: var(--code-text);
+            border-radius: 8px; overflow: auto; max-height: 34vh; white-space: pre-wrap; word-break: break-all;
+            font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; min-height: 52px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; align-items: center; }
+  button { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent);
+           background: var(--accent); color: var(--on-accent); cursor: pointer; }
+  button:hover { background: var(--accent-dark); }
+  button.secondary { background: transparent; color: var(--accent-dark); }
+  button.secondary:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .bar label, .top label { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 6px;
+          padding: 8px 12px; margin-top: 8px; font-size: 13px; }
+  .warn ul { margin: 0; padding-left: 18px; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 16px; margin: 4px 0 12px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--accent-dark); }
+  table#exp { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  table#exp td { padding: 5px 8px 5px 0; vertical-align: top; border-top: 1px solid var(--line); }
+  table#exp td:first-child { width: 46%; }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+  .top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 4px 0 0; }
+  fieldset { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+             margin: 16px 0; padding: 4px 16px 8px; }
+  fieldset[hidden] { display: none; }
+  legend { font-weight: 600; padding: 0 8px; color: var(--accent-dark); }
+  .row { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 6px 16px; padding: 10px 0;
+         border-bottom: 1px solid var(--line); align-items: start; }
+  .row[hidden] { display: none; }
+  .row:last-child { border-bottom: 0; }
+  .row > .lbl { font-weight: 600; padding-top: 6px; }
+  .help { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  input[type=text], select, textarea { width: 100%; max-width: 620px; font: inherit; padding: 6px 8px;
+      border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
+  textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible
+      { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input[type=checkbox] { width: 18px; height: 18px; margin-top: 7px; }
+  select { width: auto; max-width: 100%; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 24px; }
+  @media (max-width: 640px) { .row { grid-template-columns: minmax(0, 1fr); } .row > .lbl { padding-top: 0; }
+                              table#exp td:first-child { width: auto; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>GitKit <span class="badge">offline</span></h1>
+  <p class="sub">Pick your options and get a ready-to-run <code>git</code> command, with a plain-English explanation of every part. Nothing is sent anywhere: this page makes no network requests.</p>
+
+  <div class="out">
+    <pre id="out" aria-live="polite"></pre>
+    <div class="bar">
+      <button id="copy" type="button">Copy command</button>
+      <button id="save" type="button" class="secondary">Save as script</button>
+      <label>Shell
+        <select id="shell">
+          <option value="posix">bash / zsh / sh</option>
+          <option value="ps">PowerShell</option>
+          <option value="cmd">Windows cmd</option>
+        </select>
+      </label>
+      <label>Flags
+        <select id="syntax">
+          <option value="short">Short (-x)</option>
+          <option value="long">Long (--example)</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="multiline" style="margin:0"> Multi-line</label>
+    </div>
+    <div id="warns" class="warn" hidden></div>
+  </div>
+
+  <details id="explain" open>
+    <summary>What each part does</summary>
+    <table id="exp"></table>
+  </details>
+
+  <div class="top">
+    <label>Quick start
+      <select id="preset"><option value="">Choose a recipe...</option></select>
+    </label>
+    <button id="reset" type="button" class="secondary">Reset all</button>
+  </div>
+
+  <div id="form"></div>
+
+  <footer>This builds a suggested command; it doesn't run anything. Use it as a starting point and edit before running. Commands that rewrite history (rebase, reset --hard, force push, clean) can lose work, so the page warns you and the preview options are on by default where it helps. Less common options (worktrees, bisect, submodule, sparse-checkout details, hooks) are left out; see <code>git help</code>.</footer>
+</main>
+
+<script>
+"use strict";
+
+// ---- field constructors --------------------------------------------------
+function F(id, label, o) { var f = { id: id, label: label }; if (o) for (var k in o) f[k] = o[k]; return f; }
+function T(id, label, o) { return F(id, label, o); }
+function A(id, label, o) { o = o || {}; o.type = "area"; return F(id, label, o); }
+function C(id, label, o) { o = o || {}; o.type = "check"; return F(id, label, o); }
+function S(id, label, opts, o) { o = o || {}; o.type = "select"; o.opts = opts; return F(id, label, o); }
+function sec(title, show, fields) { return { title: title, show: show, fields: fields }; }
+function at() { return { on: "cmd", is: [].slice.call(arguments) }; }
+function when(id) { return { on: id, is: [].slice.call(arguments, 1) }; }
+function range(vals, label) { return vals.map(function (v) { return [String(v), label ? label(v) : String(v)]; }); }
+
+// ---- visibility / defaults ----------------------------------------------
+function cond(c, s) {
+  if (!c) return true;
+  if (Array.isArray(c)) return c.every(function (x) { return cond(x, s); });
+  var v = s[c.on];
+  if (c.is) return c.is.indexOf(v) > -1;
+  if (c.not) return c.not.indexOf(v) === -1;
+  return true;
+}
+function visible(f, s) { return cond(f.sec && f.sec.show, s) && cond(f.show, s); }
+function allFields() {
+  var out = [];
+  SECTIONS.forEach(function (sc) { sc.fields.forEach(function (f) { f.sec = sc; out.push(f); }); });
+  return out;
+}
+function defOf(f) {
+  if (f.def !== undefined) return f.def;
+  if (f.type === "check") return false;
+  if (f.type === "select") return f.opts[0][0];
+  return "";
+}
+function defaults() {
+  var s = { syntax: "short", shell: "posix" };
+  allFields().forEach(function (f) { s[f.id] = defOf(f); });
+  return s;
+}
+
+// ---- quoting -------------------------------------------------------------
+function safeRe(shell) {
+  return shell === "posix" ? /^[A-Za-z0-9_@%+=:,.\/-]+$/ : /^[A-Za-z0-9_@%+=:,.\/\\-]+$/;
+}
+function quoteWhole(s, shell) {
+  if (s === "") return shell === "cmd" ? '""' : "''";
+  if (safeRe(shell).test(s)) return s;
+  if (/^[A-Za-z0-9_@%+=:,.\/\\-][A-Za-z0-9_@%+=:,.\/\\~-]*$/.test(s) && (shell !== "posix" || s.indexOf("\\") < 0)) return s; // ~ is only special at the start of a word
+  if (shell === "cmd") return '"' + s.replace(/"/g, '\\"') + '"';
+  return "'" + s.replace(/'/g, shell === "posix" ? "'\\''" : "''") + "'";
+}
+function quote(s, shell) {
+  if (/^-[A-Za-z#]+$/.test(s)) return s;
+  var m = /^(--?[A-Za-z][A-Za-z0-9-]*=)([\s\S]+)$/.exec(s);
+  if (m) return m[1] + quoteWhole(m[2], shell);
+  if (shell !== "cmd" && /^~(\/|$)/.test(s)) { // keep a leading ~ so the shell can expand it
+    var rest = s.slice(2);
+    return rest === "" ? s : "~/" + quoteWhole(rest, shell);
+  }
+  return quoteWhole(s, shell);
+}
+function lines(str) {
+  return (str || "").split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+}
+// Split a typed command like:  bash -c 'echo hi'  into separate arguments.
+function splitArgs(str) {
+  var out = [], cur = "", q = "", has = false, i, c, n;
+  str = str || "";
+  for (i = 0; i < str.length; i++) {
+    c = str.charAt(i);
+    if (q) {
+      n = str.charAt(i + 1);
+      if (c === q) q = "";
+      else if (q === '"' && c === "\\" && (n === '"' || n === "\\")) { cur += n; i++; }
+      else cur += c;
+    } else if (c === "'" || c === '"') { q = c; has = true; }
+    else if (/\s/.test(c)) { if (cur !== "" || has) { out.push(cur); cur = ""; has = false; } }
+    else cur += c;
+  }
+  if (cur !== "" || has) out.push(cur);
+  return out;
+}
+
+// ---- command builder helper ---------------------------------------------
+// Each group is {t:[tokens], d:"description", h:true if it stays on the first line, m:true if mergeable like -a -v -> -av}
+function Builder(s) {
+  var L = s.syntax === "long", self = { g: [], w: [], L: L };
+  self.add = function (d, t, o) {
+    var x = { t: t, d: d };
+    if (o) for (var k in o) x[k] = o[k];
+    self.g.push(x);
+    return x;
+  };
+  self.head = function (d, t) { return self.add(d, t, { h: true }); };
+  self.flag = function (sh, lg, d) {
+    var t = L ? (lg || sh) : sh, x = self.add(d, [t]);
+    if (!L && /^-[A-Za-z]$/.test(t)) x.m = true;
+    return x;
+  };
+  self.val = function (sh, lg, v, d) { return self.add(d, [L ? (lg || sh) : sh, v]); };
+  self.opt = function (name, d) { return self.add(d, ["--" + name]); };
+  self.eq = function (name, v, d) { return self.add(d, ["--" + name + "=" + v]); };
+  self.kv = function (name, v, d) { return self.add(d, ["--" + name, v]); };
+  self.warn = function (m) { self.w.push(m); };
+  return self;
+}
+
+// ---- formatting ----------------------------------------------------------
+function tokensText(g, shell) { return g.t.map(function (t) { return quote(t, shell); }).join(" "); }
+
+function flatten(groups, shell, merge) {
+  var out = [], ci = -1, letters = "";
+  groups.forEach(function (g) {
+    if (merge && g.m && g.t.length === 1) {
+      if (ci < 0) { ci = out.length; out.push({ s: "", h: false }); }
+      letters += g.t[0].charAt(1);
+    } else out.push({ s: tokensText(g, shell), h: !!g.h });
+  });
+  if (ci >= 0) out[ci].s = "-" + letters;
+  return out;
+}
+
+function formatCommand(groups, shell, multiline, merge) {
+  var parts = flatten(groups, shell, merge), head = [APP.cmd], i = 0;
+  while (i < parts.length && parts[i].h) head.push(parts[i++].s);
+  var rest = parts.slice(i).map(function (p) { return p.s; });
+  if (!multiline) return head.concat(rest).join(" ");
+  var cont = shell === "posix" ? " \\" : (shell === "ps" ? " `" : " ^");
+  return [head.join(" ")].concat(rest).join(cont + "\n  ");
+}
+
+function shellWarnings(groups, shell, s) {
+  var toks = [], out = [];
+  groups.forEach(function (g) { g.t.forEach(function (t) { toks.push(t); }); });
+  if (shell === "ps" && toks.some(function (t) { return t.indexOf('"') > -1; }))
+    out.push("Windows PowerShell 5.1 can strip double quotes from arguments passed to other programs (PowerShell 7.3+ is fine). If a value contains double quotes, use PowerShell 7 or avoid them.");
+  if (shell === "cmd") {
+    if (toks.some(function (t) { return /[\r\n]/.test(t); })) out.push("cmd can't pass line breaks inside an argument. Keep each value on one line.");
+    if (toks.some(function (t) { return t.indexOf("%") > -1; })) out.push("Inside a .bat file, each % must be doubled (%%). At the interactive prompt, leave it as is.");
+  }
+  if (APP.shellWarn) out = out.concat(APP.shellWarn(toks, shell, s) || []);
+  return out;
+}
+
+
+var APP = { cmd: "git", file: "git-command", run: "Run Git" };
+
+var CMDS = [
+  ["status", "status: see what has changed"],
+  ["add", "add: stage changes for the next commit"],
+  ["commit", "commit: save staged changes as a snapshot"],
+  ["push", "push: upload commits to a remote"],
+  ["pull", "pull: download and combine remote changes"],
+  ["fetch", "fetch: download changes without merging"],
+  ["clone", "clone: copy a repository to your computer"],
+  ["init", "init: start a new repository here"],
+  ["branch", "branch: list, create, rename or delete branches"],
+  ["switch", "switch: move to another branch"],
+  ["merge", "merge: combine another branch into this one"],
+  ["rebase", "rebase: replay your commits on top of another branch"],
+  ["log", "log: view history"],
+  ["diff", "diff: see line-by-line changes"],
+  ["stash", "stash: shelve changes temporarily"],
+  ["restore", "restore: unstage files or discard edits"],
+  ["reset", "reset: move the branch back to an earlier commit"],
+  ["revert", "revert: undo a commit by adding a new one"],
+  ["cherry-pick", "cherry-pick: copy specific commits onto this branch"],
+  ["tag", "tag: mark a release or milestone"],
+  ["remote", "remote: manage linked repositories"],
+  ["clean", "clean: delete untracked files"]
+];
+var DEPTHS = [["", "Everything (full history)"], ["1", "Only the latest snapshot (1 commit)"], ["10", "Last 10 commits"], ["50", "Last 50 commits"], ["100", "Last 100 commits"]];
+var CONTINUE = function (start) {
+  return [["start", start], ["continue", "Continue after fixing conflicts (--continue)"], ["skip", "Skip this commit (--skip)"],
+    ["abort", "Abort and go back to how things were (--abort)"], ["quit", "Quit but keep the current state (--quit)"]];
+};
+
+var SECTIONS = [
+  sec("What do you want to do?", null, [
+    S("cmd", "Git command", CMDS, { help: "Pick a command and its options appear below." })
+  ]),
+
+  sec("Clone a repository", at("clone"), [
+    T("cloneUrl", "Repository URL", { ph: "https://github.com/user/project.git", help: "An HTTPS or SSH address, for example git@github.com:user/project.git." }),
+    T("cloneDir", "Folder name", { ph: "project", help: "Leave empty to use the repository's own name." }),
+    T("cloneBranch", "Branch to check out", { ph: "main" }),
+    S("cloneDepth", "History to download", DEPTHS, { help: "Shallow clones are much faster for big projects but can't see older history." }),
+    C("cloneSingle", "Only one branch", { help: "Skip history for other branches. Shallow clones already do this." }),
+    C("cloneRecurse", "Include submodules"),
+    S("cloneFilter", "Partial clone", [["", "Download everything"], ["blob:none", "Skip file contents until needed (blob:none)"], ["tree:0", "Skip folders and files until needed (tree:0)"]]),
+    C("cloneSparse", "Sparse checkout", { help: "Start with only the top-level files; add folders later with git sparse-checkout." }),
+    C("cloneBare", "Bare repository", { help: "No working files, just the history (used on servers)." }),
+    C("cloneNoCheckout", "Don't check out files yet"),
+    T("cloneOrigin", "Name for the remote", { ph: "origin", help: "Leave empty to use origin." })
+  ]),
+
+  sec("Start a repository", at("init"), [
+    T("initDir", "Folder", { ph: "my-project", help: "Leave empty to use the current folder." }),
+    T("initBranch", "First branch name", { ph: "main" }),
+    C("initBare", "Bare repository"),
+    C("initQuiet", "Quiet")
+  ]),
+
+  sec("Status", at("status"), [
+    C("sstShort", "Short format", { help: "One line per file." }),
+    C("sstBranch", "Show branch info"),
+    S("sstUntracked", "Untracked files", [["", "Default (list them)"], ["no", "Hide them (-uno)"], ["all", "List every file in new folders (-uall)"]]),
+    C("sstIgnored", "Also list ignored files"),
+    C("sstPorcelain", "Script-friendly output", { help: "A stable format meant for programs to read." }),
+    T("sstPath", "Only these paths", { ph: "src/ README.md", help: "Separate several with spaces." })
+  ]),
+
+  sec("Stage changes", at("add"), [
+    S("addMode", "What to stage", [["paths", "The files or folders I list below"], ["all", "Everything: new, changed and deleted (-A)"],
+      ["tracked", "Only files Git already tracks (-u)"], ["patch", "Pick chunks one by one (-p)"], ["interactive", "Interactive menu (-i)"]]),
+    T("addPaths", "Files or folders", { def: ".", ph: ". or src/ README.md", help: "Separate several with spaces. A dot means everything in the current folder.",
+      show: when("addMode", "paths", "tracked", "patch") }),
+    C("addDry", "Preview only", { help: "Show what would be staged without staging it." }),
+    C("addForce", "Include ignored files"),
+    C("addVerbose", "Verbose"),
+    C("addIntent", "Record new files without content yet", { help: "Lets git diff show them before you stage them for real." })
+  ]),
+
+  sec("Commit", at("commit"), [
+    T("commitMsg", "Message (first line)", { ph: "Fix login redirect bug", help: "Keep it under about 50 to 72 characters." }),
+    A("commitBody", "More detail (optional)", { ph: "Explain why, not just what.", help: "Added as a second paragraph." }),
+    C("commitAll", "Also stage tracked changes", { help: "Like running git add -u first." }),
+    C("commitAmend", "Replace the previous commit", { help: "Fixes the last commit instead of adding a new one." }),
+    C("commitNoEdit", "Keep the old message", { show: when("commitAmend", true) }),
+    C("commitSign", "Add a Signed-off-by line"),
+    C("commitEmpty", "Allow an empty commit"),
+    C("commitNoVerify", "Skip hooks", { help: "Bypasses pre-commit and commit-msg checks." }),
+    C("commitGpg", "Sign with GPG"),
+    T("commitAuthor", "Author", { ph: "Ada Lovelace <ada@example.com>" }),
+    T("commitDate", "Date", { ph: "2026-11-22 14:30" }),
+    T("commitFiles", "Only these files", { ph: "src/app.js README.md", help: "Commit just these paths, ignoring other staged changes." })
+  ]),
+
+  sec("Push", at("push"), [
+    T("pushRemote", "Remote", { def: "origin", ph: "origin" }),
+    T("pushRef", "Branch or tag", { ph: "main", help: "Leave empty to push the current branch." }),
+    C("pushUp", "Remember this as the default", { help: "Sets upstream so plain git push and git pull work later (-u)." }),
+    S("pushForce", "Overwrite remote history", [["", "No (default)"], ["lease", "Only if nobody else pushed (--force-with-lease)"], ["force", "Always (--force)"]]),
+    C("pushAll", "Push every branch"),
+    C("pushTags", "Push all tags"),
+    C("pushFollow", "Push tags that point at pushed commits"),
+    C("pushDelete", "Delete the branch on the remote"),
+    C("pushDry", "Preview only"),
+    C("pushAtomic", "All or nothing"),
+    C("pushNoVerify", "Skip the pre-push hook")
+  ]),
+
+  sec("Pull", at("pull"), [
+    T("pullRemote", "Remote", { ph: "origin" }),
+    T("pullBranch", "Branch", { ph: "main", help: "Leave both empty to use the branch's configured upstream." }),
+    S("pullMode", "How to combine", [["", "Git's default"], ["rebase", "Replay my commits on top (--rebase)"], ["no-rebase", "Merge (--no-rebase)"], ["ff-only", "Only fast-forward (--ff-only)"]]),
+    C("pullAuto", "Stash my edits first, then re-apply", { help: "Lets you pull with uncommitted changes." }),
+    C("pullPrune", "Remove deleted remote branches"),
+    C("pullNoCommit", "Stop before committing the merge"),
+    C("pullTags", "Also fetch all tags")
+  ]),
+
+  sec("Fetch", at("fetch"), [
+    T("fetchRemote", "Remote", { ph: "origin", show: when("fetchAll", false) }),
+    C("fetchAll", "All remotes"),
+    C("fetchPrune", "Remove deleted remote branches"),
+    C("fetchTags", "Also fetch all tags"),
+    S("fetchDepth", "History to fetch", DEPTHS),
+    C("fetchDry", "Preview only")
+  ]),
+
+  sec("Branch", at("branch"), [
+    S("brMode", "What to do", [["list", "List branches"], ["create", "Create a branch"], ["rename", "Rename a branch"], ["delete", "Delete a merged branch (-d)"],
+      ["forceDelete", "Delete even if unmerged (-D)"], ["upstream", "Set which remote branch it tracks"], ["current", "Show the current branch name"]]),
+    T("brName", "Branch name", { ph: "feature/login", show: when("brMode", "create", "rename", "delete", "forceDelete", "upstream"), help: "For delete, several names can be separated by spaces. When renaming, leave empty to rename the current branch." }),
+    T("brNew", "New name", { ph: "feature/sign-in", show: when("brMode", "rename") }),
+    T("brStart", "Start from", { ph: "main", help: "A branch, tag or commit. Leave empty to start from where you are.", show: when("brMode", "create") }),
+    T("brUp", "Track this remote branch", { ph: "origin/main", show: when("brMode", "upstream") }),
+    S("brWhich", "Which branches", [["", "Local only"], ["r", "Remote branches (-r)"], ["a", "Local and remote (-a)"]], { show: when("brMode", "list") }),
+    C("brVV", "Show last commit and tracking info", { show: when("brMode", "list") }),
+    T("brPattern", "Name pattern", { ph: "feature/*", show: when("brMode", "list") }),
+    S("brMerged", "Merge status", [["", "All"], ["merged", "Already merged (--merged)"], ["no-merged", "Not merged yet (--no-merged)"]], { show: when("brMode", "list") }),
+    T("brRef", "...relative to", { ph: "main", help: "Leave empty for the current branch.", show: [when("brMode", "list"), when("brMerged", "merged", "no-merged")] }),
+    T("brContains", "Containing this commit", { ph: "abc1234", show: when("brMode", "list") })
+  ]),
+
+  sec("Switch branch", at("switch"), [
+    S("swMode", "What to do", [["existing", "Go to an existing branch"], ["create", "Create a new branch and go to it (-c)"],
+      ["forceCreate", "Create it, or reset it if it exists (-C)"], ["detach", "Look at a commit without a branch (--detach)"], ["previous", "Go back to the previous branch"]]),
+    T("swName", "Branch or commit", { ph: "feature/login", show: when("swMode", "existing", "create", "forceCreate", "detach") }),
+    T("swStart", "Start from", { ph: "main", help: "Leave empty to start from where you are.", show: when("swMode", "create", "forceCreate") }),
+    C("swTrack", "Track the start point", { show: when("swMode", "create", "forceCreate") }),
+    C("swForce", "Throw away local changes", { help: "Discards uncommitted edits that would block the switch." })
+  ]),
+
+  sec("Merge", at("merge"), [
+    S("mgMode", "What to do", [["merge", "Merge a branch into this one"], ["abort", "Cancel a merge in progress (--abort)"],
+      ["continue", "Finish after fixing conflicts (--continue)"], ["quit", "Forget the merge but keep the files (--quit)"]]),
+    T("mgBranch", "Branch to merge in", { ph: "feature/login", show: when("mgMode", "merge") }),
+    S("mgFf", "Merge style", [["", "Git's default (fast-forward when possible)"], ["no-ff", "Always create a merge commit (--no-ff)"], ["ff-only", "Only fast-forward (--ff-only)"]], { show: when("mgMode", "merge") }),
+    C("mgSquash", "Squash into one set of changes", { help: "Stages everything without making a commit.", show: when("mgMode", "merge") }),
+    C("mgNoCommit", "Stop before committing", { show: when("mgMode", "merge") }),
+    T("mgMsg", "Merge message", { ph: "Merge feature/login", show: when("mgMode", "merge") }),
+    C("mgNoEdit", "Accept the default message", { show: when("mgMode", "merge") }),
+    S("mgX", "If there are conflicts", [["", "Stop and let me fix them"], ["ours", "Prefer my side (-X ours)"], ["theirs", "Prefer their side (-X theirs)"]], { show: when("mgMode", "merge") })
+  ]),
+
+  sec("Rebase", at("rebase"), [
+    S("rbMode", "What to do", CONTINUE("Start a rebase")),
+    T("rbUpstream", "Rebase onto", { ph: "main", show: when("rbMode", "start") }),
+    T("rbBranch", "Branch to rebase", { ph: "feature/login", help: "Leave empty for the current branch.", show: when("rbMode", "start") }),
+    C("rbInteractive", "Choose what to do with each commit", { help: "Opens an editor to reorder, squash or reword.", show: when("rbMode", "start") }),
+    C("rbAuto", "Auto-arrange fixup commits", { show: when("rbMode", "start") }),
+    C("rbAutostash", "Stash my edits first", { show: when("rbMode", "start") }),
+    C("rbMerges", "Keep merge commits", { show: when("rbMode", "start") }),
+    T("rbOnto", "Transplant onto", { ph: "newbase", help: "Advanced: move commits from Rebase onto..branch onto this base instead.", show: when("rbMode", "start") }),
+    T("rbExec", "Run a command after each commit", { ph: "npm test", show: when("rbMode", "start") })
+  ]),
+
+  sec("Log", at("log"), [
+    T("lgRange", "Branch or range", { ph: "main..feature", help: "Leave empty for the current branch." }),
+    T("lgPath", "Only changes to this path", { ph: "src/app.js" }),
+    S("lgPretty", "Layout", [["", "Default"], ["oneline", "One line per commit"], ["short", "Short"], ["full", "Full"], ["fuller", "Fuller (with dates)"], ["custom", "Custom format..."]]),
+    T("lgFormat", "Custom format", { ph: "%h %an %s", show: when("lgPretty", "custom"), help: "Placeholders: %h short hash, %an author, %ar relative date, %s subject." }),
+    S("lgCount", "How many", [["", "No limit"]].concat(range([5, 10, 20, 50, 100]))),
+    C("lgGraph", "Draw branch graph"),
+    C("lgAll", "All branches and tags"),
+    C("lgDecorate", "Show branch and tag names"),
+    C("lgStat", "Files changed and line counts"),
+    C("lgPatch", "Show the changes in each commit"),
+    C("lgNoMerges", "Hide merge commits"),
+    C("lgFirst", "Follow only the first parent", { help: "Gives a cleaner history on branches that merge a lot." }),
+    C("lgFollow", "Follow the file through renames", { help: "Needs a single file path above." }),
+    T("lgAuthor", "Author contains", { ph: "ada" }),
+    T("lgGrep", "Message contains", { ph: "login" }),
+    T("lgSince", "Since", { ph: "2 weeks ago" }),
+    T("lgUntil", "Until", { ph: "2026-11-01" })
+  ]),
+
+  sec("Diff", at("diff"), [
+    S("dfMode", "Compare", [["worktree", "Edits not yet staged"], ["staged", "Staged changes (--staged)"], ["head", "All changes since the last commit (HEAD)"],
+      ["refs", "Two commits or branches (A B)"], ["merge", "What B added since it split from A (A...B)"]]),
+    T("dfA", "A", { ph: "main", show: when("dfMode", "refs", "merge") }),
+    T("dfB", "B", { ph: "feature/login", show: when("dfMode", "refs", "merge") }),
+    T("dfPath", "Only this path", { ph: "src/app.js" }),
+    C("dfStat", "Summary with line counts"),
+    S("dfNames", "File names only", [["", "No, show the changes"], ["name-only", "List changed files (--name-only)"], ["name-status", "List changed files with status (--name-status)"]]),
+    C("dfWord", "Highlight changed words"),
+    C("dfWs", "Ignore whitespace"),
+    S("dfCtx", "Lines of context", [["", "Default (3)"], ["0", "None"], ["1", "1"], ["5", "5"], ["10", "10"], ["25", "25"]])
+  ]),
+
+  sec("Stash", at("stash"), [
+    S("stMode", "What to do", [["push", "Save my changes (push)"], ["list", "List stashes"], ["show", "Show what a stash contains"], ["pop", "Apply the latest and remove it (pop)"],
+      ["apply", "Apply but keep it (apply)"], ["drop", "Delete one stash"], ["clear", "Delete all stashes"], ["branch", "Make a branch from a stash"]]),
+    T("stMsg", "Label", { ph: "half-done login form", show: when("stMode", "push") }),
+    C("stUntracked", "Include new, untracked files", { show: when("stMode", "push") }),
+    C("stAll", "Include ignored files too", { show: when("stMode", "push") }),
+    C("stKeep", "Keep staged changes staged", { show: when("stMode", "push") }),
+    C("stPatch", "Pick chunks one by one", { show: when("stMode", "push") }),
+    T("stPaths", "Only these paths", { ph: "src/app.js", show: when("stMode", "push") }),
+    T("stRef", "Which stash", { ph: "stash@{0}", help: "Leave empty for the most recent.", show: when("stMode", "show", "pop", "apply", "drop", "branch") }),
+    C("stIndex", "Also restore what was staged", { show: when("stMode", "pop", "apply") }),
+    C("stShowP", "Show the full diff", { show: when("stMode", "show") }),
+    T("stBranchName", "New branch name", { ph: "rescue-login", show: when("stMode", "branch") })
+  ]),
+
+  sec("Restore files", at("restore"), [
+    T("rsPaths", "Files", { ph: "src/app.js or .", help: "Separate several with spaces. A dot means everything here." }),
+    S("rsMode", "What to restore", [["worktree", "Discard my edits in the folder"], ["staged", "Unstage only (keep my edits)"], ["both", "Unstage and discard edits"]]),
+    T("rsSrc", "Take the content from", { ph: "HEAD~2", help: "A commit, branch or tag. Leave empty for the usual source." }),
+    C("rsPatch", "Pick chunks one by one")
+  ]),
+
+  sec("Reset", at("reset"), [
+    S("rtMode", "How far to reset", [["mixed", "Unstage but keep my files (--mixed)"], ["soft", "Keep files and staging (--soft)"], ["hard", "Discard everything (--hard)"], ["keep", "Reset but keep my local edits (--keep)"]]),
+    T("rtTarget", "Reset to", { def: "HEAD~1", ph: "HEAD~1", help: "HEAD~1 means one commit back. Can also be a commit hash or branch." }),
+    T("rtPaths", "Or just unstage these files", { ph: "src/app.js", help: "When filled in, the mode and target above are ignored." })
+  ]),
+
+  sec("Revert", at("revert"), [
+    S("rvMode", "What to do", [["start", "Undo commits"], ["continue", "Continue after fixing conflicts (--continue)"], ["skip", "Skip (--skip)"], ["abort", "Abort (--abort)"], ["quit", "Quit (--quit)"]]),
+    T("rvCommits", "Commit(s) to undo", { ph: "abc1234", help: "Separate several with spaces.", show: when("rvMode", "start") }),
+    C("rvNoCommit", "Apply the undo but don't commit yet", { show: when("rvMode", "start") }),
+    C("rvNoEdit", "Use the default message", { show: when("rvMode", "start") }),
+    S("rvMain", "Undoing a merge commit?", [["", "No"], ["1", "Keep parent 1 (the branch you merged into)"], ["2", "Keep parent 2"]], { show: when("rvMode", "start") })
+  ]),
+
+  sec("Cherry-pick", at("cherry-pick"), [
+    S("cpMode", "What to do", CONTINUE("Copy commits")),
+    T("cpCommits", "Commit(s)", { ph: "abc1234 def5678", help: "Separate several with spaces. A..B copies a range.", show: when("cpMode", "start") }),
+    C("cpNoCommit", "Apply but don't commit yet", { show: when("cpMode", "start") }),
+    C("cpX", "Record the original commit hash in the message", { show: when("cpMode", "start") }),
+    C("cpEdit", "Edit the message", { show: when("cpMode", "start") }),
+    C("cpSign", "Add a Signed-off-by line", { show: when("cpMode", "start") }),
+    S("cpMain", "Copying a merge commit?", [["", "No"], ["1", "Keep parent 1"], ["2", "Keep parent 2"]], { show: when("cpMode", "start") })
+  ]),
+
+  sec("Tags", at("tag"), [
+    S("tgMode", "What to do", [["list", "List tags"], ["lightweight", "Create a simple tag"], ["annotated", "Create an annotated tag with a message (-a)"],
+      ["signed", "Create a signed tag (-s)"], ["delete", "Delete a local tag (-d)"], ["verify", "Check a tag's signature (-v)"]]),
+    T("tgName", "Tag name", { ph: "v1.2.0", show: when("tgMode", "lightweight", "annotated", "signed", "delete", "verify") }),
+    T("tgCommit", "Tag this commit", { ph: "abc1234", help: "Leave empty to tag the current commit.", show: when("tgMode", "lightweight", "annotated", "signed") }),
+    T("tgMsg", "Message", { ph: "Release 1.2.0", show: when("tgMode", "annotated", "signed") }),
+    C("tgForce", "Replace the tag if it exists", { show: when("tgMode", "lightweight", "annotated", "signed") }),
+    T("tgPattern", "Only tags matching", { ph: "v1.*", show: when("tgMode", "list") }),
+    S("tgSort", "Order", [["", "Alphabetical"], ["-creatordate", "Newest first"], ["version:refname", "By version number"]], { show: when("tgMode", "list") })
+  ]),
+
+  sec("Remotes", at("remote"), [
+    S("rmMode", "What to do", [["list", "List remotes with URLs"], ["show", "Show details about one"], ["add", "Add a remote"], ["remove", "Remove a remote"],
+      ["rename", "Rename a remote"], ["seturl", "Change a remote's URL"], ["geturl", "Print a remote's URL"], ["prune", "Remove stale tracking branches"]]),
+    T("rmName", "Remote name", { ph: "origin", show: when("rmMode", "show", "add", "remove", "rename", "seturl", "geturl", "prune") }),
+    T("rmUrl", "URL", { ph: "https://github.com/user/project.git", show: when("rmMode", "add", "seturl") }),
+    T("rmNew", "New name", { ph: "upstream", show: when("rmMode", "rename") }),
+    C("rmFetch", "Fetch right after adding", { show: when("rmMode", "add") })
+  ]),
+
+  sec("Clean untracked files", at("clean"), [
+    C("clDry", "Preview only", { def: true, help: "Lists what would be deleted. Turn off to delete for real." }),
+    C("clDirs", "Include untracked folders"),
+    S("clMode", "Which files", [["", "Untracked files only"], ["x", "Also ignored files (-x)"], ["X", "Only ignored files (-X)"]]),
+    C("clInter", "Choose interactively"),
+    C("clQuiet", "Quiet"),
+    T("clPaths", "Only these paths", { ph: "build/ tmp/" })
+  ]),
+
+  sec("Run options", null, [
+    T("gitDir", "Run in this folder", { ph: "~/projects/app", help: "Same as cd to that folder first (git -C)." }),
+    A("gitCfg", "Temporary settings", { ph: "user.name=Ada\ncore.editor=nano", help: "One name=value per line. Applies to this command only (git -c)." }),
+    C("gitNoPager", "Don't use a pager", { help: "Print everything straight to the terminal." })
+  ])
+];
+
+var PRESETS = {
+  "See what changed (short)": { cmd: "status", sstShort: true, sstBranch: true },
+  "Stage everything": { cmd: "add", addMode: "all" },
+  "Commit tracked changes": { cmd: "commit", commitMsg: "Fix typo in README", commitAll: true },
+  "Fix the last commit message": { cmd: "commit", commitAmend: true, commitMsg: "Clearer message" },
+  "Push a new branch": { cmd: "push", pushRef: "my-feature", pushUp: true },
+  "Safer force push": { cmd: "push", pushRef: "my-feature", pushForce: "lease" },
+  "Pull with rebase": { cmd: "pull", pullMode: "rebase", pullAuto: true },
+  "Fast shallow clone": { cmd: "clone", cloneUrl: "https://github.com/user/project.git", cloneDepth: "1" },
+  "New branch and switch to it": { cmd: "switch", swMode: "create", swName: "feature/login" },
+  "Pretty history graph": { cmd: "log", lgPretty: "oneline", lgGraph: true, lgAll: true, lgDecorate: true, lgCount: "20" },
+  "Undo last commit, keep changes": { cmd: "reset", rtMode: "soft", rtTarget: "HEAD~1" },
+  "Stash including new files": { cmd: "stash", stMode: "push", stUntracked: true, stMsg: "work in progress" },
+  "Unstage a file": { cmd: "restore", rsPaths: "src/app.js", rsMode: "staged" },
+  "Interactive rebase of 5 commits": { cmd: "rebase", rbUpstream: "HEAD~5", rbInteractive: true, rbAuto: true },
+  "Annotated release tag": { cmd: "tag", tgMode: "annotated", tgName: "v1.0.0", tgMsg: "First release" },
+  "Preview what clean would delete": { cmd: "clean", clDry: true, clDirs: true }
+};
+
+function build(s) {
+  var b = Builder(s), c = s.cmd;
+  function paths(str, d) { var p = splitArgs(str); p.forEach(function (x) { b.add(d, [x]); }); return p; }
+  function trim(v) { return (v || "").trim(); }
+
+  if (trim(s.gitDir)) b.head("Run as if started in this folder", ["-C", trim(s.gitDir)]);
+  lines(s.gitCfg).forEach(function (l) {
+    b.head("Temporarily set " + l.split("=")[0] + " for this command", ["-c", l]);
+    if (l.indexOf("=") < 0) b.warn("The setting \"" + l + "\" needs a value in the form name=value.");
+  });
+  if (s.gitNoPager) b.head("Print output directly, without a pager", ["--no-pager"]);
+
+  switch (c) {
+  case "clone":
+    b.head("Copy a repository to your computer", ["clone"]);
+    if (trim(s.cloneBranch)) b.val("-b", "--branch", trim(s.cloneBranch), "Check out this branch instead of the default one");
+    if (s.cloneDepth) b.eq("depth", s.cloneDepth, "Only download the latest " + s.cloneDepth + " commit(s) of history");
+    if (s.cloneSingle) b.opt("single-branch", "Only download history for one branch");
+    if (s.cloneRecurse) b.opt("recurse-submodules", "Also clone any submodules");
+    if (s.cloneFilter) b.eq("filter", s.cloneFilter, "Partial clone: fetch file contents only when needed");
+    if (s.cloneSparse) b.opt("sparse", "Start with only the top-level files");
+    if (s.cloneBare) b.opt("bare", "Make a bare repository (history only, no working files)");
+    if (s.cloneNoCheckout) b.flag("-n", "--no-checkout", "Don't check out any files yet");
+    if (trim(s.cloneOrigin)) b.val("-o", "--origin", trim(s.cloneOrigin), "Call the remote \"" + trim(s.cloneOrigin) + "\" instead of origin");
+    if (trim(s.cloneUrl)) b.add("The repository to copy", [trim(s.cloneUrl)]); else b.warn("Enter the repository URL to clone.");
+    if (trim(s.cloneDir)) b.add("Put it in this folder", [trim(s.cloneDir)]);
+    if (s.cloneBare && s.cloneNoCheckout) b.warn("A bare repository never has files checked out, so \"don't check out\" is redundant.");
+    break;
+
+  case "init":
+    b.head("Start a new repository", ["init"]);
+    if (trim(s.initBranch)) b.val("-b", "--initial-branch", trim(s.initBranch), "Name the first branch \"" + trim(s.initBranch) + "\"");
+    if (s.initBare) b.opt("bare", "Make a bare repository (history only)");
+    if (s.initQuiet) b.flag("-q", "--quiet", "Only print errors");
+    if (trim(s.initDir)) b.add("Create it in this folder", [trim(s.initDir)]);
+    break;
+
+  case "status":
+    b.head("Show which files changed", ["status"]);
+    if (s.sstShort) b.flag("-s", "--short", "Compact output, one line per file");
+    if (s.sstBranch) b.flag("-b", "--branch", "Also show the branch and its tracking info");
+    if (s.sstUntracked === "no") b.add("Hide untracked files", ["-uno"]);
+    if (s.sstUntracked === "all") b.add("List every file inside untracked folders", ["-uall"]);
+    if (s.sstIgnored) b.opt("ignored", "Also list ignored files");
+    if (s.sstPorcelain) b.opt("porcelain", "Stable output meant for scripts");
+    paths(s.sstPath, "Only report on this path");
+    break;
+
+  case "add":
+    b.head("Stage changes for the next commit", ["add"]);
+    if (s.addMode === "all") b.flag("-A", "--all", "Stage everything: new, changed and deleted files");
+    if (s.addMode === "tracked") b.flag("-u", "--update", "Stage changes only to files Git already tracks");
+    if (s.addMode === "patch") b.flag("-p", "--patch", "Review each chunk and choose what to stage");
+    if (s.addMode === "interactive") b.flag("-i", "--interactive", "Open the interactive staging menu");
+    if (s.addDry) b.flag("-n", "--dry-run", "Show what would be staged without doing it");
+    if (s.addForce) b.flag("-f", "--force", "Also add files that .gitignore would skip");
+    if (s.addVerbose) b.flag("-v", "--verbose", "Print each file as it is staged");
+    if (s.addIntent) b.flag("-N", "--intent-to-add", "Register new files without staging their content yet");
+    if (s.addMode === "paths" || s.addMode === "tracked" || s.addMode === "patch") {
+      var ap = paths(s.addPaths, "Stage this path");
+      if (!ap.length && s.addMode === "paths") b.warn("Enter at least one file or folder, for example . for everything here.");
+      if (ap.indexOf(".") > -1 && s.addMode === "paths") b.warn("A dot stages everything in this folder, including files you may not want to commit. Run git status first.");
+    }
+    break;
+
+  case "commit":
+    b.head("Save a snapshot of the staged changes", ["commit"]);
+    if (s.commitAll) b.flag("-a", "--all", "Also stage changes to files Git already tracks");
+    if (s.commitAmend) b.opt("amend", "Replace the previous commit instead of adding a new one");
+    if (s.commitAmend && s.commitNoEdit) b.opt("no-edit", "Keep the previous commit's message");
+    if (s.commitEmpty) b.opt("allow-empty", "Allow a commit that changes nothing");
+    if (s.commitSign) b.flag("-s", "--signoff", "Add a Signed-off-by line");
+    if (s.commitNoVerify) b.flag("-n", "--no-verify", "Skip the pre-commit and commit-msg hooks");
+    if (s.commitGpg) b.flag("-S", "--gpg-sign", "Sign the commit with your GPG key");
+    if (trim(s.commitAuthor)) b.eq("author", trim(s.commitAuthor), "Record this author");
+    if (trim(s.commitDate)) b.eq("date", trim(s.commitDate), "Record this date");
+    var msg = trim(s.commitMsg);
+    if (msg) b.val("-m", "--message", msg, "Use this as the message (first line)");
+    if (trim(s.commitBody)) b.val("-m", "--message", trim(s.commitBody), "Add this as a second paragraph of the message");
+    var cf = splitArgs(s.commitFiles);
+    if (cf.length) b.add("Only commit these paths", ["--"].concat(cf));
+    if (!msg && !(s.commitAmend && s.commitNoEdit)) b.warn("No message given, so Git will open your text editor to ask for one.");
+    if (msg.length > 72) b.warn("The first line is " + msg.length + " characters. About 50 to 72 is the usual limit.");
+    if (s.commitAmend) b.warn("Amending rewrites the last commit. Avoid it once that commit has been pushed and shared.");
+    if (s.commitNoVerify) b.warn("Skipping hooks also skips your tests and linters.");
+    break;
+
+  case "push":
+    b.head("Upload your commits", ["push"]);
+    if (s.pushUp) b.flag("-u", "--set-upstream", "Remember this remote branch so plain git push and git pull work later");
+    if (s.pushForce === "lease") b.opt("force-with-lease", "Overwrite the remote branch only if nobody else pushed since your last fetch");
+    if (s.pushForce === "force") b.flag("-f", "--force", "Overwrite the remote branch no matter what");
+    if (s.pushAll) b.opt("all", "Push every local branch");
+    if (s.pushTags) b.opt("tags", "Also push all tags");
+    if (s.pushFollow) b.opt("follow-tags", "Also push annotated tags that point at the pushed commits");
+    if (s.pushDelete) b.flag("-d", "--delete", "Delete the named branch on the remote");
+    if (s.pushDry) b.flag("-n", "--dry-run", "Show what would be pushed without sending anything");
+    if (s.pushAtomic) b.opt("atomic", "Update all refs or none of them");
+    if (s.pushNoVerify) b.opt("no-verify", "Skip the pre-push hook");
+    var rem = trim(s.pushRemote), ref = trim(s.pushRef);
+    if (rem) b.add("Push to the remote named \"" + rem + "\"", [rem]);
+    if (ref) b.add(s.pushDelete ? "The branch to delete" : "Push this branch or tag", [ref]);
+    if (s.pushForce) b.warn("A force push rewrites the remote history and can erase teammates' commits." + (s.pushForce === "force" ? " --force-with-lease is the safer choice." : ""));
+    if (s.pushDelete && !ref) b.warn("Enter the branch to delete.");
+    if (s.pushAll && ref) b.warn("--all pushes every branch, so naming one branch as well conflicts.");
+    if (ref && !rem) b.warn("A branch name needs a remote before it, usually origin.");
+    break;
+
+  case "pull":
+    b.head("Download and combine remote changes", ["pull"]);
+    if (s.pullMode === "rebase") b.opt("rebase", "Replay your local commits on top of the remote ones");
+    if (s.pullMode === "no-rebase") b.opt("no-rebase", "Combine with a merge");
+    if (s.pullMode === "ff-only") b.opt("ff-only", "Refuse unless it can simply fast-forward");
+    if (s.pullAuto) b.opt("autostash", "Stash your edits first and re-apply them afterwards");
+    if (s.pullPrune) b.flag("-p", "--prune", "Remove remote branches that no longer exist");
+    if (s.pullNoCommit) b.opt("no-commit", "Merge but stop before committing");
+    if (s.pullTags) b.flag("-t", "--tags", "Also fetch all tags");
+    if (trim(s.pullRemote)) b.add("Pull from this remote", [trim(s.pullRemote)]);
+    if (trim(s.pullBranch)) b.add("Pull this branch", [trim(s.pullBranch)]);
+    if (trim(s.pullBranch) && !trim(s.pullRemote)) b.warn("A branch name needs a remote before it, usually origin.");
+    break;
+
+  case "fetch":
+    b.head("Download new commits without changing your files", ["fetch"]);
+    if (s.fetchAll) b.opt("all", "Fetch from every remote");
+    if (s.fetchPrune) b.flag("-p", "--prune", "Remove remote branches that no longer exist");
+    if (s.fetchTags) b.flag("-t", "--tags", "Also fetch all tags");
+    if (s.fetchDepth) b.eq("depth", s.fetchDepth, "Only fetch the latest " + s.fetchDepth + " commit(s) of history");
+    if (s.fetchDry) b.opt("dry-run", "Show what would be fetched without doing it");
+    if (!s.fetchAll && trim(s.fetchRemote)) b.add("Fetch from this remote", [trim(s.fetchRemote)]);
+    break;
+
+  case "branch":
+    b.head("Work with branches", ["branch"]);
+    var nm = splitArgs(s.brName);
+    if (s.brMode === "list") {
+      if (s.brWhich === "r") b.flag("-r", "--remotes", "List remote branches");
+      if (s.brWhich === "a") b.flag("-a", "--all", "List local and remote branches");
+      if (s.brVV) b.add("Show each branch's last commit and tracking info", ["-vv"]);
+      if (s.brMerged) {
+        b.opt(s.brMerged, s.brMerged === "merged" ? "Only branches already merged" : "Only branches not yet merged");
+        if (trim(s.brRef)) b.add("...relative to this branch", [trim(s.brRef)]);
+      }
+      if (trim(s.brContains)) b.kv("contains", trim(s.brContains), "Only branches containing this commit");
+      if (trim(s.brPattern)) { b.flag("-l", "--list", "List branches matching a pattern"); b.add("The pattern", [trim(s.brPattern)]); }
+    } else if (s.brMode === "create") {
+      nm.forEach(function (n) { b.add("Create this branch", [n]); });
+      if (trim(s.brStart)) b.add("Start it from here", [trim(s.brStart)]);
+      if (!nm.length) b.warn("Enter a name for the new branch.");
+    } else if (s.brMode === "rename") {
+      b.flag("-m", "--move", "Rename a branch");
+      nm.forEach(function (n) { b.add("Rename this branch", [n]); });
+      if (trim(s.brNew)) b.add("New name", [trim(s.brNew)]); else b.warn("Enter the new name.");
+    } else if (s.brMode === "delete") {
+      b.flag("-d", "--delete", "Delete a branch that is fully merged");
+      nm.forEach(function (n) { b.add("Delete this branch", [n]); });
+      if (!nm.length) b.warn("Enter the branch to delete.");
+    } else if (s.brMode === "forceDelete") {
+      b.add("Delete a branch even if it isn't merged", ["-D"]);
+      nm.forEach(function (n) { b.add("Delete this branch", [n]); });
+      if (!nm.length) b.warn("Enter the branch to delete.");
+      b.warn("-D throws away commits that exist only on that branch.");
+    } else if (s.brMode === "upstream") {
+      if (trim(s.brUp)) b.eq("set-upstream-to", trim(s.brUp), "Make the branch track this remote branch"); else b.warn("Enter the remote branch to track, for example origin/main.");
+      nm.forEach(function (n) { b.add("The local branch (empty means the current one)", [n]); });
+    } else if (s.brMode === "current") {
+      b.opt("show-current", "Print the name of the current branch");
+    }
+    break;
+
+  case "switch":
+    b.head("Change to another branch", ["switch"]);
+    var sn = trim(s.swName);
+    if (s.swMode === "previous") b.add("Go back to the branch you were on before", ["-"]);
+    else {
+      if (s.swMode === "create") b.flag("-c", "--create", "Create a new branch and switch to it");
+      if (s.swMode === "forceCreate") b.flag("-C", "--force-create", "Create the branch, or reset it if it already exists");
+      if (s.swMode === "detach") b.flag("-d", "--detach", "Check out a commit directly (detached HEAD)");
+      if (s.swTrack && (s.swMode === "create" || s.swMode === "forceCreate")) b.flag("-t", "--track", "Track the start point");
+    }
+    if (s.swForce) b.flag("-f", "--force", "Throw away local changes to complete the switch");
+    if (s.swMode !== "previous") {
+      if (sn) b.add(s.swMode === "detach" ? "The commit to look at" : "The branch", [sn]); else b.warn("Enter a branch name.");
+      if (trim(s.swStart) && (s.swMode === "create" || s.swMode === "forceCreate")) b.add("Start it from here", [trim(s.swStart)]);
+    }
+    if (s.swForce) b.warn("-f discards uncommitted edits that conflict with the switch.");
+    if (s.swMode === "detach") b.warn("In detached HEAD, new commits belong to no branch. Create one with git switch -c to keep them.");
+    break;
+
+  case "merge":
+    b.head("Combine branches", ["merge"]);
+    if (s.mgMode !== "merge") b.opt(s.mgMode, { abort: "Cancel the merge and return to how things were", "continue": "Finish the merge after fixing conflicts", quit: "Forget the merge but keep the current files" }[s.mgMode]);
+    else {
+      if (s.mgFf === "no-ff") b.opt("no-ff", "Always create a merge commit");
+      if (s.mgFf === "ff-only") b.opt("ff-only", "Refuse unless it can simply fast-forward");
+      if (s.mgSquash) b.opt("squash", "Stage the combined changes without making a merge commit");
+      if (s.mgNoCommit) b.opt("no-commit", "Merge but stop before committing");
+      if (s.mgNoEdit) b.opt("no-edit", "Accept the automatic merge message");
+      if (trim(s.mgMsg)) b.val("-m", "--message", trim(s.mgMsg), "Use this merge message");
+      if (s.mgX) b.val("-X", "-X", s.mgX, s.mgX === "ours" ? "On conflicts, prefer your side" : "On conflicts, prefer their side");
+      if (trim(s.mgBranch)) b.add("The branch to merge into the current one", [trim(s.mgBranch)]); else b.warn("Enter the branch to merge.");
+      if (s.mgSquash && s.mgFf === "no-ff") b.warn("--squash never makes a merge commit, so --no-ff has no effect.");
+      b.warn("A merge applies to the branch you are on now. Switch to the receiving branch first.");
+    }
+    break;
+
+  case "rebase":
+    b.head("Replay commits on a new base", ["rebase"]);
+    if (s.rbMode !== "start") b.opt(s.rbMode, { "continue": "Continue after fixing conflicts", skip: "Skip the current commit", abort: "Abort and go back to how things were", quit: "Stop but keep the current state" }[s.rbMode]);
+    else {
+      if (s.rbInteractive) b.flag("-i", "--interactive", "Choose what to do with each commit in an editor");
+      if (s.rbAuto) b.opt("autosquash", "Move fixup! and squash! commits into place");
+      if (s.rbAutostash) b.opt("autostash", "Stash your edits first and re-apply them afterwards");
+      if (s.rbMerges) b.flag("-r", "--rebase-merges", "Keep merge commits");
+      if (trim(s.rbExec)) b.val("-x", "--exec", trim(s.rbExec), "Run this command after each commit");
+      if (trim(s.rbOnto)) b.kv("onto", trim(s.rbOnto), "Place the commits on top of this base");
+      if (trim(s.rbUpstream)) b.add("Commits after this point are replayed", [trim(s.rbUpstream)]);
+      else b.warn("Enter the branch or commit to rebase onto, for example main.");
+      if (trim(s.rbBranch)) b.add("The branch to rebase", [trim(s.rbBranch)]);
+      b.warn("Rebasing rewrites history. Don't rebase commits other people have already pulled.");
+    }
+    break;
+
+  case "log":
+    b.head("Show commit history", ["log"]);
+    if (s.lgCount) b.val("-n", "--max-count", s.lgCount, "Show at most " + s.lgCount + " commits");
+    if (s.lgPretty === "oneline") b.opt("oneline", "One line per commit");
+    else if (s.lgPretty === "custom") { if (trim(s.lgFormat)) b.eq("format", trim(s.lgFormat), "Use your own layout"); else b.warn("Enter a custom format, for example %h %an %s."); }
+    else if (s.lgPretty) b.eq("pretty", s.lgPretty, "Use the \"" + s.lgPretty + "\" layout");
+    if (s.lgGraph) b.opt("graph", "Draw the branch structure next to the commits");
+    if (s.lgAll) b.opt("all", "Include every branch and tag");
+    if (s.lgDecorate) b.opt("decorate", "Show branch and tag names beside commits");
+    if (s.lgStat) b.opt("stat", "Show changed files and line counts");
+    if (s.lgPatch) b.flag("-p", "--patch", "Show the changes in each commit");
+    if (s.lgNoMerges) b.opt("no-merges", "Hide merge commits");
+    if (s.lgFirst) b.opt("first-parent", "Follow only the first parent of merges");
+    if (s.lgFollow) b.opt("follow", "Keep following the file through renames");
+    if (trim(s.lgAuthor)) b.eq("author", trim(s.lgAuthor), "Only commits by authors matching this");
+    if (trim(s.lgGrep)) b.eq("grep", trim(s.lgGrep), "Only commits whose message matches this");
+    if (trim(s.lgSince)) b.eq("since", trim(s.lgSince), "Only commits after this time");
+    if (trim(s.lgUntil)) b.eq("until", trim(s.lgUntil), "Only commits before this time");
+    if (trim(s.lgRange)) b.add("Only this branch or range", [trim(s.lgRange)]);
+    if (trim(s.lgPath)) b.add("Only commits that touch this path", ["--", trim(s.lgPath)]);
+    if (s.lgFollow && !trim(s.lgPath)) b.warn("--follow needs a single file path.");
+    break;
+
+  case "diff":
+    b.head("Show line-by-line changes", ["diff"]);
+    if (s.dfStat) b.opt("stat", "Summarize with line counts");
+    if (s.dfNames === "name-only") b.opt("name-only", "List only the names of changed files");
+    if (s.dfNames === "name-status") b.opt("name-status", "List changed files with a status letter");
+    if (s.dfWord) b.opt("word-diff", "Highlight changed words rather than whole lines");
+    if (s.dfWs) b.flag("-w", "--ignore-all-space", "Ignore whitespace differences");
+    if (s.dfCtx) b.add("Show " + s.dfCtx + " lines of context around each change", ["-U" + s.dfCtx]);
+    if (s.dfMode === "staged") b.opt("staged", "Compare staged changes with the last commit");
+    if (s.dfMode === "head") b.add("Compare the working folder with the last commit", ["HEAD"]);
+    if (s.dfMode === "refs") {
+      if (trim(s.dfA) && trim(s.dfB)) { b.add("First commit or branch", [trim(s.dfA)]); b.add("Second commit or branch", [trim(s.dfB)]); }
+      else b.warn("Enter both A and B.");
+    }
+    if (s.dfMode === "merge") {
+      if (trim(s.dfA) && trim(s.dfB)) b.add("Changes on B since it split from A", [trim(s.dfA) + "..." + trim(s.dfB)]);
+      else b.warn("Enter both A and B.");
+    }
+    if (trim(s.dfPath)) b.add("Only this path", ["--", trim(s.dfPath)]);
+    break;
+
+  case "stash":
+    b.head("Shelve changes temporarily", ["stash"]);
+    var sm = s.stMode;
+    if (sm === "push") {
+      b.head("Save your working changes", ["push"]);
+      if (s.stPatch) b.flag("-p", "--patch", "Pick chunks to stash one by one");
+      if (s.stUntracked) b.flag("-u", "--include-untracked", "Also stash new, untracked files");
+      if (s.stAll) b.flag("-a", "--all", "Also stash ignored files");
+      if (s.stKeep) b.flag("-k", "--keep-index", "Leave staged changes in place");
+      if (trim(s.stMsg)) b.val("-m", "--message", trim(s.stMsg), "Label the stash");
+      var sp = splitArgs(s.stPaths);
+      if (sp.length) b.add("Only stash these paths", ["--"].concat(sp));
+    } else {
+      b.head({ list: "List all stashes", show: "Show what a stash contains", pop: "Re-apply a stash and delete it", apply: "Re-apply a stash and keep it",
+        drop: "Delete one stash", clear: "Delete every stash", branch: "Make a branch from a stash" }[sm], [sm]);
+      if (sm === "show" && s.stShowP) b.flag("-p", "--patch", "Show the full diff");
+      if ((sm === "pop" || sm === "apply") && s.stIndex) b.opt("index", "Also restore what was staged");
+      if (sm === "branch") { if (trim(s.stBranchName)) b.add("Name of the new branch", [trim(s.stBranchName)]); else b.warn("Enter a name for the new branch."); }
+      if (trim(s.stRef) && sm !== "list" && sm !== "clear") b.add("Which stash", [trim(s.stRef)]);
+      if (sm === "drop") b.warn("A dropped stash is hard to get back.");
+      if (sm === "clear") b.warn("This deletes every stash and can't easily be undone.");
+    }
+    break;
+
+  case "restore":
+    b.head("Unstage files or discard edits", ["restore"]);
+    if (s.rsMode === "staged" || s.rsMode === "both") b.flag("-S", "--staged", "Unstage: remove from the next commit but keep your edits");
+    if (s.rsMode === "both") b.flag("-W", "--worktree", "Also discard the edits in your working folder");
+    if (trim(s.rsSrc)) b.eq("source", trim(s.rsSrc), "Take the content from this commit instead");
+    if (s.rsPatch) b.flag("-p", "--patch", "Choose chunks one by one");
+    var rp = paths(s.rsPaths, "Restore this path");
+    if (!rp.length) b.warn("Enter at least one file (use . for everything here).");
+    if (s.rsMode === "worktree" || s.rsMode === "both") b.warn("This permanently discards uncommitted edits to those files.");
+    break;
+
+  case "reset":
+    b.head("Move the branch back to an earlier commit", ["reset"]);
+    var rpth = splitArgs(s.rtPaths);
+    if (rpth.length) {
+      b.add("Unstage these paths", ["--"].concat(rpth));
+      b.warn("With paths, Git only unstages those files. The mode and target are ignored.");
+    } else {
+      if (s.rtMode === "soft") b.opt("soft", "Move the branch but keep files and staging as they are");
+      if (s.rtMode === "mixed") b.opt("mixed", "Move the branch and unstage, but keep your files");
+      if (s.rtMode === "hard") b.opt("hard", "Move the branch and discard all uncommitted work");
+      if (s.rtMode === "keep") b.opt("keep", "Move the branch but keep local edits that don't conflict");
+      if (trim(s.rtTarget)) b.add("Go back to this commit", [trim(s.rtTarget)]);
+      if (s.rtMode === "hard") b.warn("--hard permanently deletes uncommitted changes in tracked files.");
+      b.warn("If those commits were already pushed, undoing them this way needs a force push. On shared branches use revert instead.");
+    }
+    break;
+
+  case "revert":
+    b.head("Undo a commit by adding a new one", ["revert"]);
+    if (s.rvMode !== "start") b.opt(s.rvMode, { "continue": "Continue after fixing conflicts", skip: "Skip this commit", abort: "Abort and go back", quit: "Stop but keep the current state" }[s.rvMode]);
+    else {
+      if (s.rvNoCommit) b.flag("-n", "--no-commit", "Apply the undo but don't commit yet");
+      if (s.rvNoEdit) b.opt("no-edit", "Use the default message");
+      if (s.rvMain) b.val("-m", "--mainline", s.rvMain, "When undoing a merge, keep parent " + s.rvMain);
+      var rc = splitArgs(s.rvCommits);
+      rc.forEach(function (x) { b.add("The commit to undo", [x]); });
+      if (!rc.length) b.warn("Enter the commit to undo.");
+    }
+    break;
+
+  case "cherry-pick":
+    b.head("Copy commits onto the current branch", ["cherry-pick"]);
+    if (s.cpMode !== "start") b.opt(s.cpMode, { "continue": "Continue after fixing conflicts", skip: "Skip this commit", abort: "Abort and go back", quit: "Stop but keep the current state" }[s.cpMode]);
+    else {
+      if (s.cpNoCommit) b.flag("-n", "--no-commit", "Apply the changes but don't commit yet");
+      if (s.cpX) b.flag("-x", "-x", "Record the original commit hash in the message");
+      if (s.cpEdit) b.flag("-e", "--edit", "Edit the commit message");
+      if (s.cpSign) b.flag("-s", "--signoff", "Add a Signed-off-by line");
+      if (s.cpMain) b.val("-m", "--mainline", s.cpMain, "When copying a merge, keep parent " + s.cpMain);
+      var cc = splitArgs(s.cpCommits);
+      cc.forEach(function (x) { b.add("The commit to copy", [x]); });
+      if (!cc.length) b.warn("Enter at least one commit.");
+    }
+    break;
+
+  case "tag":
+    b.head("Mark a point in history", ["tag"]);
+    var tn = trim(s.tgName), tm = s.tgMode;
+    if (tm === "list") {
+      b.flag("-l", "--list", "List tags");
+      if (s.tgSort) b.eq("sort", s.tgSort, "Order the list");
+      if (trim(s.tgPattern)) b.add("Only tags matching this pattern", [trim(s.tgPattern)]);
+    } else {
+      if (tm === "annotated") b.flag("-a", "--annotate", "Create an annotated tag (stores author, date and message)");
+      if (tm === "signed") b.flag("-s", "--sign", "Create a GPG-signed tag");
+      if (tm === "delete") b.flag("-d", "--delete", "Delete this local tag");
+      if (tm === "verify") b.flag("-v", "--verify", "Check the tag's signature");
+      if (s.tgForce && (tm === "lightweight" || tm === "annotated" || tm === "signed")) b.flag("-f", "--force", "Replace the tag if it already exists");
+      if ((tm === "annotated" || tm === "signed") && trim(s.tgMsg)) b.val("-m", "--message", trim(s.tgMsg), "The tag's message");
+      if (tn) b.add("The tag name", [tn]); else b.warn("Enter a tag name.");
+      if (trim(s.tgCommit) && tm !== "delete" && tm !== "verify") b.add("Tag this commit instead of the current one", [trim(s.tgCommit)]);
+      if ((tm === "annotated" || tm === "signed") && !trim(s.tgMsg)) b.warn("No message given, so Git will open your editor.");
+      if (tm === "lightweight" || tm === "annotated" || tm === "signed") b.warn("Tags aren't uploaded automatically. Push one with git push origin " + (tn || "<tag>") + ", or all with --tags.");
+    }
+    break;
+
+  case "remote":
+    b.head("Manage linked repositories", ["remote"]);
+    var rn = trim(s.rmName), rm = s.rmMode;
+    if (rm === "list") b.flag("-v", "--verbose", "Show each remote with its URLs");
+    else {
+      var verb = { show: "show", add: "add", remove: "remove", rename: "rename", seturl: "set-url", geturl: "get-url", prune: "prune" }[rm];
+      b.head("Run this remote action", [verb]);
+      if (rm === "add" && s.rmFetch) b.flag("-f", "--fetch", "Fetch right after adding");
+      if (rn) b.add("The remote's name", [rn]); else b.warn("Enter the remote's name, for example origin.");
+      if (rm === "rename") { if (trim(s.rmNew)) b.add("Its new name", [trim(s.rmNew)]); else b.warn("Enter the new name."); }
+      if (rm === "add" || rm === "seturl") { if (trim(s.rmUrl)) b.add("The repository address", [trim(s.rmUrl)]); else b.warn("Enter the repository URL."); }
+    }
+    break;
+
+  case "clean":
+    b.head("Delete untracked files", ["clean"]);
+    if (s.clDry) b.flag("-n", "--dry-run", "Preview only: list what would be deleted");
+    else b.flag("-f", "--force", "Actually delete (Git requires this)");
+    if (s.clDirs) b.add("Include untracked folders", ["-d"]);
+    if (s.clMode === "x") b.add("Also delete ignored files", ["-x"]);
+    if (s.clMode === "X") b.add("Delete only ignored files", ["-X"]);
+    if (s.clInter) b.flag("-i", "--interactive", "Choose what to delete interactively");
+    if (s.clQuiet) b.flag("-q", "--quiet", "Don't list each file");
+    var cl = splitArgs(s.clPaths);
+    if (cl.length) b.add("Only look in these paths", ["--"].concat(cl));
+    if (!s.clDry) b.warn("Deleted untracked files are gone for good; they aren't in Git history. Run the preview first.");
+    break;
+  }
+  return { groups: b.g, warnings: b.w };
+}
+
+
+// ---- UI ------------------------------------------------------------------
+if (typeof document !== "undefined") {
+  var $ = function (id) { return document.getElementById(id); };
+  var rows = {}, sets = [];
+
+  function make(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function render() {
+    var host = $("form");
+    SECTIONS.forEach(function (sc) {
+      var fs = make("fieldset");
+      fs.appendChild(make("legend", "", sc.title));
+      sc.fields.forEach(function (f) {
+        var row = make("div", "row");
+        var lblWrap = make("div", "lbl");
+        var lbl = make("label", "", f.label); lbl.htmlFor = f.id; lblWrap.appendChild(lbl);
+        var cell = make("div");
+        var inp;
+        if (f.type === "select") {
+          inp = make("select");
+          f.opts.forEach(function (o) { inp.appendChild(new Option(o[1], o[0])); });
+        } else if (f.type === "check") {
+          inp = make("input"); inp.type = "checkbox";
+        } else if (f.type === "area") {
+          inp = make("textarea"); inp.rows = 4; inp.spellcheck = false;
+        } else {
+          inp = make("input"); inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false;
+        }
+        inp.id = f.id;
+        if (f.ph) inp.placeholder = f.ph;
+        cell.appendChild(inp);
+        if (f.help) cell.appendChild(make("div", "help", f.help));
+        row.appendChild(lblWrap); row.appendChild(cell);
+        fs.appendChild(row);
+        rows[f.id] = row;
+      });
+      host.appendChild(fs);
+      sets.push({ el: fs, sec: sc });
+    });
+    var ps = $("preset");
+    Object.keys(PRESETS).forEach(function (k) { ps.appendChild(new Option(k, k)); });
+  }
+
+  function readState() {
+    var s = defaults();
+    allFields().forEach(function (f) {
+      var e = $(f.id);
+      s[f.id] = f.type === "check" ? e.checked : e.value;
+    });
+    s.syntax = $("syntax").value;
+    s.shell = $("shell").value;
+    return s;
+  }
+  function setField(id, v) {
+    var e = $(id); if (!e) return;
+    if (e.type === "checkbox") e.checked = !!v; else e.value = v;
+  }
+  function resetAll() {
+    var d = defaults();
+    allFields().forEach(function (f) { setField(f.id, d[f.id]); });
+  }
+
+  var lastText = "", lastGroups = [], lastMerge = true;
+  function update() {
+    var s = readState();
+    allFields().forEach(function (f) { rows[f.id].hidden = !visible(f, s); });
+    sets.forEach(function (x) {
+      x.el.hidden = !x.sec.fields.some(function (f) { return !rows[f.id].hidden; });
+    });
+    var r = build(s);
+    lastGroups = r.groups;
+    lastMerge = s.syntax === "short";
+    lastText = formatCommand(r.groups, s.shell, $("multiline").checked, lastMerge);
+    $("out").textContent = lastText;
+
+    var tbl = $("exp"); tbl.textContent = "";
+    var head = make("tr");
+    var c1 = make("td"); c1.appendChild(make("code", "", APP.cmd));
+    head.appendChild(c1); head.appendChild(make("td", "", APP.run));
+    tbl.appendChild(head);
+    r.groups.forEach(function (g) {
+      var tr = make("tr"), a = make("td"), b = make("td", "", g.d);
+      a.appendChild(make("code", "", tokensText(g, s.shell)));
+      tr.appendChild(a); tr.appendChild(b); tbl.appendChild(tr);
+    });
+
+    var warns = r.warnings.concat(shellWarnings(r.groups, s.shell, s));
+    var w = $("warns"); w.textContent = "";
+    if (warns.length) {
+      w.hidden = false;
+      var ul = make("ul");
+      warns.forEach(function (t) { ul.appendChild(make("li", "", t)); });
+      w.appendChild(ul);
+    } else w.hidden = true;
+  }
+
+  render();
+  resetAll();
+  document.addEventListener("input", update);
+  document.addEventListener("change", update);
+
+  $("preset").addEventListener("change", function () {
+    var p = PRESETS[$("preset").value];
+    if (!p) return;
+    resetAll();
+    Object.keys(p).forEach(function (k) { setField(k, p[k]); });
+    $("preset").value = "";
+    update();
+  });
+  $("reset").addEventListener("click", function () { resetAll(); update(); });
+
+  $("copy").addEventListener("click", function () {
+    var done = function () {
+      var b = $("copy"); b.textContent = "Copied!";
+      setTimeout(function () { b.textContent = "Copy command"; }, 1500);
+    };
+    var fallback = function () {
+      var t = document.createElement("textarea");
+      t.value = lastText; t.style.position = "fixed"; t.style.opacity = "0";
+      document.body.appendChild(t); t.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+      document.body.removeChild(t);
+    };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(lastText).then(done, fallback);
+    else fallback();
+  });
+
+  $("save").addEventListener("click", function () {
+    var shell = $("shell").value;
+    var ext = shell === "posix" ? "sh" : (shell === "ps" ? "ps1" : "bat");
+    var head = shell === "posix" ? "#!/usr/bin/env bash\n" : (shell === "cmd" ? "@echo off\n" : "");
+    var blob = new Blob([head + formatCommand(lastGroups, shell, true, lastMerge) + "\n"], { type: "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = APP.file + "." + ext;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  update();
+}
+
+if (typeof module !== "undefined") module.exports = {
+  APP: APP, build: build, formatCommand: formatCommand, defaults: defaults, shellWarnings: shellWarnings,
+  PRESETS: PRESETS, SECTIONS: SECTIONS, quote: quote, allFields: allFields, visible: visible, splitArgs: splitArgs
+};
+
+</script>
+</body>
+</html>
