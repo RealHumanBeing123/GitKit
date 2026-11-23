@@ -28,3 +28,5 @@ Only the options for the command you pick are shown, so the page stays short. `g
 Less common features (worktrees, bisect, submodule commands, sparse-checkout details, hooks) are left out. See `git help` for those.
 
 Just open `GitKit.html` in any browser. It works with no internet connection.
+
+<img width="737" height="969" alt="gitkit" src="https://github.com/user-attachments/assets/8cfbddc7-6c04-422a-8aae-9912a6f7d6ff" />
